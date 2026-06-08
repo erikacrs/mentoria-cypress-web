@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retrospectiva de Bugs — Sprint</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav {
+      position: fixed;
+      bottom: 24px;
+      display: flex;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .nav button {
+      background: #334155;
+      color: #f1f5f9;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .nav button:hover { background: #475569; }
+
+    .counter {
+      position: fixed;
+      top: 16px;
+      right: 24px;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .slide {
+      display: none;
+      width: 900px;
+      min-height: 520px;
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 52px 60px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+      animation: fadein 0.3s ease;
+    }
+
+    .slide.active { display: flex; flex-direction: column; justify-content: center; }
+
+    @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .tag {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #38bdf8;
+      margin-bottom: 12px;
+    }
+
+    h1 { font-size: 42px; font-weight: 800; line-height: 1.2; color: #f8fafc; }
+    h2 { font-size: 28px; font-weight: 700; color: #f8fafc; margin-bottom: 24px; }
+    h3 { font-size: 18px; font-weight: 600; color: #94a3b8; margin-bottom: 8px; }
+
+    .subtitle { font-size: 18px; color: #94a3b8; margin-top: 16px; }
+
+    /* KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .kpi {
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 20px 16px;
+      text-align: center;
+      border: 1px solid #334155;
+    }
+
+    .kpi .value {
+      font-size: 38px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .kpi .label { font-size: 12px; color: #94a3b8; line-height: 1.3; }
+
+    .green { color: #4ade80; }
+    .red { color: #f87171; }
+    .yellow { color: #fbbf24; }
+    .blue { color: #38bdf8; }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      background: #0f172a;
+      color: #64748b;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1e293b;
+      color: #cbd5e1;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .table-wrapper {
+      background: #0f172a;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #334155;
+    }
+
+    /* Badge */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-green { background: #14532d; color: #4ade80; }
+    .badge-red { background: #450a0a; color: #f87171; }
+    .badge-yellow { background: #451a03; color: #fbbf24; }
+
+    /* Alert box */
+    .alert {
+      background: #450a0a;
+      border: 1px solid #f87171;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-top: 8px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .alert-icon { font-size: 28px; }
+    .alert-title { font-size: 16px; font-weight: 700; color: #f87171; margin-bottom: 6px; }
+    .alert-body { font-size: 14px; color: #fca5a5; line-height: 1.6; }
+
+    /* Points list */
+    .point-list { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+
+    .point-list li {
+      background: #0f172a;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 15px;
+      color: #cbd5e1;
+      border-left: 3px solid #38bdf8;
+      line-height: 1.5;
+    }
+
+    .point-list li strong { color: #f8fafc; }
+
+    /* Progress bar */
+    .bar-wrap { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+    .bar-label { font-size: 13px; color: #94a3b8; width: 120px; flex-shrink: 0; }
+    .bar-bg { flex: 1; background: #0f172a; border-radius: 99px; height: 10px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 99px; }
+    .bar-val { font-size: 13px; color: #f1f5f9; width: 40px; text-align: right; flex-shrink: 0; }
+
+    /* Two-col */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 8px; }
+
+    .card {
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #334155;
+    }
+
+    .card h3 { font-size: 14px; color: #64748b; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+
+    .area-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 14px; color: #cbd5e1; }
+    .area-item:last-child { border-bottom: none; }
+
+    /* Final slide */
+    .action-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .action-item { display: flex; gap: 14px; align-items: flex-start; background: #0f172a; border-radius: 10px; padding: 14px 18px; }
+    .action-num { font-size: 20px; font-weight: 800; color: #38bdf8; width: 28px; flex-shrink: 0; }
+    .action-text { font-size: 14px; color: #cbd5e1; line-height: 1.5; }
+    .action-text strong { color: #f8fafc; }
+  </style>
+</head>
+<body>
+
+<div class="counter" id="counter">1 / 6</div>
+
+<!-- SLIDE 1: Capa -->
+<div class="slide active">
+  <div class="tag">Retrospectiva · Sprint atual</div>
+  <h1>Análise de Bugs<br/>da Sprint</h1>
+  <p class="subtitle">18 itens · 01/jun/2026 · Time DOCK</p>
+</div>
+
+<!-- SLIDE 2: KPIs -->
+<div class="slide">
+  <div class="tag">Visão Geral</div>
+  <h2>Números da Sprint</h2>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="value blue">18</div>
+      <div class="label">Total de bugs abertos</div>
+    </div>
+    <div class="kpi">
+      <div class="value green">12</div>
+      <div class="label">Fechados <br/>(67%)</div>
+    </div>
+    <div class="kpi">
+      <div class="value red">6</div>
+      <div class="label">Cancelados <br/>(33%)</div>
+    </div>
+    <div class="kpi">
+      <div class="value yellow">~43h</div>
+      <div class="label">Tempo total registrado</div>
+    </div>
+  </div>
+  <div style="margin-top: 20px;">
+    <div class="bar-wrap">
+      <div class="bar-label">Fechados</div>
+      <div class="bar-bg"><div class="bar-fill" style="width:67%; background:#4ade80;"></div></div>
+      <div class="bar-val">67%</div>
+    </div>
+    <div class="bar-wrap">
+      <div class="bar-label">Cancelados</div>
+      <div class="bar-bg"><div class="bar-fill" style="width:33%; background:#f87171;"></div></div>
+      <div class="bar-val">33%</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 3: Alerta cancelamentos -->
+<div class="slide">
+  <div class="tag">Ponto de Atenção</div>
+  <h2>Taxa de Cancelamento Alta</h2>
+  <div class="alert">
+    <div class="alert-icon">⚠️</div>
+    <div>
+      <div class="alert-title">1 em cada 3 bugs foi cancelado</div>
+      <div class="alert-body">
+        Dos 18 bugs abertos, <strong>6 foram cancelados</strong> — representando <strong>~10 horas de esforço</strong> (23% do tempo total registrado) sem entrega de valor.<br/><br/>
+        Bugs sem responsável designado (DOCK-3538, DOCK-3537) foram cancelados sem investigação documentada.
+      </div>
+    </div>
+  </div>
+  <ul class="point-list" style="margin-top: 20px;">
+    <li><strong>Possível causa:</strong> bugs abertos prematuramente, sem investigação mínima antes do registro.</li>
+    <li><strong>Pergunta para o time:</strong> qual é o critério atual para abrir um Sub-Bug?</li>
+  </ul>
+</div>
+
+<!-- SLIDE 4: Por pessoa e por área -->
+<div class="slide">
+  <div class="tag">Distribuição</div>
+  <h2>Por Pessoa e Área</h2>
+  <div class="two-col">
+    <div class="card">
+      <h3>Por Responsável</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Dev</th><th>Total</th><th>Fechados</th><th>Horas</th></tr></thead>
+          <tbody>
+            <tr><td>Leonardo</td><td>7</td><td><span class="badge badge-green">5</span></td><td>~20h</td></tr>
+            <tr><td>Franciely</td><td>4</td><td><span class="badge badge-green">3</span></td><td>~14h</td></tr>
+            <tr><td>Ana Flávia</td><td>4</td><td><span class="badge badge-green">3</span></td><td>~6h</td></tr>
+            <tr><td>Maria Luíza</td><td>1</td><td><span class="badge badge-green">1</span></td><td>~3h</td></tr>
+            <tr><td>Sem resp.</td><td>2</td><td><span class="badge badge-red">0</span></td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Por Componente</h3>
+      <div class="area-item"><span>Filas (queue/processing)</span><span class="badge badge-yellow">3</span></div>
+      <div class="area-item"><span>batch-service</span><span class="badge badge-yellow">3</span></div>
+      <div class="area-item"><span>IAC</span><span class="badge badge-yellow">2</span></div>
+      <div class="area-item"><span>Feedzai / Alias</span><span class="badge badge-yellow">2</span></div>
+      <div class="area-item"><span>commons-shared</span><span class="badge badge-yellow">1</span></div>
+      <div class="area-item"><span>Outros</span><span class="badge badge-yellow">7</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 5: Outros pontos -->
+<div class="slide">
+  <div class="tag">Observações</div>
+  <h2>O que mais chama atenção</h2>
+  <ul class="point-list">
+    <li><strong>Tempo médio de resolução: ~5 dias</strong> (mín: horas, máx: 10 dias). Bug mais lento: DOCK-3554 (remoção de retry logic).</li>
+    <li><strong>Auto-relato dominante:</strong> quase todos os bugs foram abertos e resolvidos pela mesma pessoa — boa proatividade técnica, mas QA externo ausente no loop.</li>
+    <li><strong>100% dos bugs classificados como Trivial</strong> — sem diferenciação de severidade, o que dificulta a priorização real.</li>
+    <li><strong>Nenhum bug tem Data Limite definida</strong> — impossível medir SLA ou priorizar por urgência.</li>
+  </ul>
+</div>
+
+<!-- SLIDE 6: Ações sugeridas -->
+<div class="slide">
+  <div class="tag">Próximos Passos</div>
+  <h2>Ações para a Próxima Sprint</h2>
+  <div class="action-list">
+    <div class="action-item">
+      <div class="action-num">1</div>
+      <div class="action-text"><strong>Definir critério mínimo</strong> para abertura de Sub-Bug — investigação prévia obrigatória antes do registro.</div>
+    </div>
+    <div class="action-item">
+      <div class="action-num">2</div>
+      <div class="action-text"><strong>Usar severidades reais</strong> (Critical / High / Medium / Low) em vez de marcar tudo como Trivial.</div>
+    </div>
+    <div class="action-item">
+      <div class="action-num">3</div>
+      <div class="action-text"><strong>Sempre atribuir responsável</strong> ao criar um bug — bugs sem dono tendem a ser cancelados sem documentação.</div>
+    </div>
+    <div class="action-item">
+      <div class="action-num">4</div>
+      <div class="action-text"><strong>Monitorar batch-service e filas</strong> — 6 bugs em 2 componentes concentrados indicam instabilidade pontual que vale atenção técnica.</div>
+    </div>
+  </div>
+</div>
+
+<div class="nav">
+  <button onclick="prev()">← Anterior</button>
+  <button onclick="next()">Próximo →</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+
+  function show(n) {
+    slides[current].classList.remove('active');
+    current = (n + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    document.getElementById('counter').textContent = `${current + 1} / ${slides.length}`;
+  }
+
+  function next() { show(current + 1); }
+  function prev() { show(current - 1); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') next();
+    if (e.key === 'ArrowLeft') prev();
+  });
+</script>
+</body>
+</html>

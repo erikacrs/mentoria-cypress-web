@@ -1,0 +1,520 @@
+{
+  "info": {
+    "name": "DOCK-2199 - MOL Massivo - POST /v1/batches",
+    "description": "Testes do endpoint de criação de presigned URL para upload de batch.\n\nPré-requisitos:\n- Variável de ambiente `base_url` apontando para o batch-service (ex: http://localhost:8080)\n- Variável `participant_id_valid` com um participant-id ativo e com permissão de tipo correto\n- Variável `participant_id_inactive` com um participant-id cadastrado mas inativo\n- Variável `participant_id_wrong_type` com um participant-id com tipo não permitido",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "participant_id_valid",
+      "value": "participant-001",
+      "type": "string"
+    },
+    {
+      "key": "participant_id_inactive",
+      "value": "participant-inactive",
+      "type": "string"
+    },
+    {
+      "key": "participant_id_wrong_type",
+      "value": "participant-wrong-type",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "✅ 201 - Fluxo feliz (PAYMENT_TRANSACTION)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code é 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test('Content-Type é application/json', function () {",
+              "    pm.response.to.have.header('Content-Type');",
+              "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test('Campo id está presente e é um UUID válido', function () {",
+              "    pm.expect(body).to.have.property('id');",
+              "    pm.expect(body.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+              "    pm.collectionVariables.set('last_batch_id', body.id);",
+              "});",
+              "",
+              "pm.test('batch_type retornado é PAYMENT_TRANSACTION', function () {",
+              "    pm.expect(body.batch_type).to.equal('PAYMENT_TRANSACTION');",
+              "});",
+              "",
+              "pm.test('status retornado é AWAITING_UPLOAD', function () {",
+              "    pm.expect(body.status).to.equal('AWAITING_UPLOAD');",
+              "});",
+              "",
+              "pm.test('upload_url está presente e contém assinatura S3', function () {",
+              "    pm.expect(body).to.have.property('upload_url');",
+              "    pm.expect(body.upload_url).to.be.a('string').and.not.be.empty;",
+              "    pm.expect(body.upload_url).to.include('X-Amz-Signature');",
+              "    pm.collectionVariables.set('last_upload_url', body.upload_url);",
+              "});",
+              "",
+              "pm.test('upload_url contém o path correto com participant-id e batch-id', function () {",
+              "    const participantId = pm.collectionVariables.get('participant_id_valid');",
+              "    const batchId = body.id;",
+              "    pm.expect(body.upload_url).to.include(participantId);",
+              "    pm.expect(body.upload_url).to.include(batchId);",
+              "    pm.expect(body.upload_url).to.include('input.csv');",
+              "});",
+              "",
+              "pm.test('upload_expires_at está no formato RFC3339 e dentro de 15 minutos', function () {",
+              "    pm.expect(body).to.have.property('upload_expires_at');",
+              "    const expiresAt = new Date(body.upload_expires_at);",
+              "    pm.expect(expiresAt).to.be.a('date').and.not.eql(new Date('Invalid Date'));",
+              "",
+              "    const now = new Date();",
+              "    const diffMinutes = (expiresAt - now) / 1000 / 60;",
+              "    pm.expect(diffMinutes).to.be.within(1, 16); // entre 1 e 16 min a partir de agora",
+              "});",
+              "",
+              "pm.test('created_at está presente e é uma data válida', function () {",
+              "    pm.expect(body).to.have.property('created_at');",
+              "    const createdAt = new Date(body.created_at);",
+              "    pm.expect(createdAt).to.be.a('date').and.not.eql(new Date('Invalid Date'));",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "participant-id",
+            "value": "{{participant_id_valid}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batch_type\": \"PAYMENT_TRANSACTION\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/batches",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "batches"]
+        }
+      }
+    },
+    {
+      "name": "❌ 400 - participant-id ausente no header",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code é 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test('Resposta contém mensagem de erro', function () {",
+              "    pm.expect(body).to.have.property('error').or.have.property('message').or.have.property('code');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batch_type\": \"PAYMENT_TRANSACTION\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/batches",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "batches"]
+        },
+        "description": "Não envia o header participant-id. Deve retornar 400."
+      }
+    },
+    {
+      "name": "❌ 400 - batch_type ausente no body",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code é 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test('Resposta contém mensagem de erro', function () {",
+              "    pm.expect(body).to.have.property('error').or.have.property('message').or.have.property('code');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "participant-id",
+            "value": "{{participant_id_valid}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/batches",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "batches"]
+        },
+        "description": "Envia body sem o campo batch_type. Deve retornar 400."
+      }
+    },
+    {
+      "name": "❌ 400 - batch_type com valor desconhecido",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code é 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test('Resposta contém mensagem de erro indicando batch_type inválido', function () {",
+              "    const responseText = JSON.stringify(body).toLowerCase();",
+              "    pm.expect(responseText).to.satisfy(text =>",
+              "        text.includes('batch_type') || text.includes('invalid') || text.includes('inválido') || text.includes('error')",
+              "    );",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "participant-id",
+            "value": "{{participant_id_valid}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batch_type\": \"INVALID_TYPE\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/batches",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "batches"]
+        },
+        "description": "Envia um batch_type que não existe no ENUM. Deve retornar 400."
+      }
+    },
+    {
+      "name": "❌ 400 - tipo errado no campo batch_type (MOL5005)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code é 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test('Código de erro é MOL5005 (tipo errado no campo)', function () {",
+              "    const responseText = JSON.stringify(body);",
+              "    pm.expect(responseText).to.include('MOL5005');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "participant-id",
+            "value": "{{participant_id_valid}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batch_type\": 12345\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/batches",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "batches"]
+        },
+        "description": "Envia batch_type como número (integer) em vez de string. Deve retornar 400 com código MOL5005."
+      }
+    },
+    {
+      "name": "❌ 400 - body com JSON malformado",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code é 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "participant-id",
+            "value": "{{participant_id_valid}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ batch_type: PAYMENT_TRANSACTION }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/batches",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "batches"]
+        },
+        "description": "Envia JSON inválido (sem aspas). Deve retornar 400."
+      }
+    },
+    {
+      "name": "❌ 403 - participante não encontrado",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code é 403 Forbidden', function () {",
+              "    pm.response.to.have.status(403);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test('Resposta contém mensagem de erro de autorização', function () {",
+              "    pm.expect(body).to.have.property('error').or.have.property('message').or.have.property('code');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "participant-id",
+            "value": "participant-nao-existe-99999"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batch_type\": \"PAYMENT_TRANSACTION\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/batches",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "batches"]
+        },
+        "description": "Envia um participant-id que não existe no banco. Deve retornar 403."
+      }
+    },
+    {
+      "name": "❌ 403 - participante inativo",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code é 403 Forbidden', function () {",
+              "    pm.response.to.have.status(403);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test('Resposta contém mensagem de erro de autorização', function () {",
+              "    pm.expect(body).to.have.property('error').or.have.property('message').or.have.property('code');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "participant-id",
+            "value": "{{participant_id_inactive}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batch_type\": \"PAYMENT_TRANSACTION\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/batches",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "batches"]
+        },
+        "description": "Envia um participant-id que existe mas está inativo (active=false). Deve retornar 403."
+      }
+    },
+    {
+      "name": "❌ 403 - participante com tipo sem permissão",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code é 403 Forbidden', function () {",
+              "    pm.response.to.have.status(403);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test('Resposta contém mensagem de erro de autorização', function () {",
+              "    pm.expect(body).to.have.property('error').or.have.property('message').or.have.property('code');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "participant-id",
+            "value": "{{participant_id_wrong_type}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batch_type\": \"PAYMENT_TRANSACTION\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/batches",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "batches"]
+        },
+        "description": "Envia um participant-id cujo tipo está bloqueado pela regra ShouldBlockParticipantByType. Deve retornar 403."
+      }
+    }
+  ]
+}
